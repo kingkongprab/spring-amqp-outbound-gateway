@@ -1,0 +1,47 @@
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:int="http://www.springframework.org/schema/integration"
+	xmlns:int-amqp="http://www.springframework.org/schema/integration/amqp"
+	xmlns:rabbit="http://www.springframework.org/schema/rabbit"
+	xmlns:int-stream="http://www.springframework.org/schema/integration/stream"
+	xsi:schemaLocation="http://www.springframework.org/schema/integration/amqp http://www.springframework.org/schema/integration/amqp/spring-integration-amqp.xsd
+		http://www.springframework.org/schema/integration http://www.springframework.org/schema/integration/spring-integration.xsd
+		http://www.springframework.org/schema/integration/stream http://www.springframework.org/schema/integration/stream/spring-integration-stream.xsd
+		http://www.springframework.org/schema/rabbit http://www.springframework.org/schema/rabbit/spring-rabbit.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+		
+		<int:gateway id="outboundGateway" service-interface="com.amqp.outbound.gateway.OutboundGateway"     
+    						default-reply-channel="defaultReplyChannel" >
+	    	<int:method name="process"   request-channel="inboundRequestChannel"/>
+    	</int:gateway>
+    	
+	   	<int:channel id="defaultReplyChannel"/>
+	    <int:channel id="inboundRequestChannel"/>
+	    <int:channel id="enrichedInboundRequestChannel"/>
+	    <int:channel id="processAuthRequestChannel"/>
+    	<int:channel id="postProcessorChannel"/>
+    	
+    	<int:chain input-channel="inboundRequestChannel" output-channel="enrichedInboundRequestChannel">
+	    	<int:service-activator id="serviceActivator"
+                           ref="ouboundService"  method="createRequest"/>
+    	</int:chain>
+    	
+    	<int-amqp:outbound-gateway id="outboundGtwyId" header-mapper="headerMapper"
+    						request-channel="enrichedInboundRequestChannel"
+    						reply-channel="defaultReplyChannel"
+							amqp-template="template" 
+							reply-timeout="30000" 
+							exchange-name="request_exchange" 
+						    routing-key="request_exchange_queue"/>
+						    
+		<int-amqp:inbound-channel-adapter id="amqpMessageDriven"  queue-names="request_queue" 
+									 connection-factory="rabbitConnectionFactory"  channel="processAuthRequestChannel"/>
+	
+    	<int:service-activator id="serviceActivator"
+                           ref="ouboundService" input-channel="processAuthRequestChannel" output-channel="postProcessorChannel"
+                           method="processRequest"/>
+                           
+        <int-amqp:outbound-channel-adapter amqp-template="template" channel="postProcessorChannel" 
+        		header-mapper="headerMapper" exchange-name="reply_exchange" routing-key="reply_exchange_queue"/>
+        
+    	<bean id="headerMapper" class="org.springframework.integration.amqp.support.DefaultAmqpHeaderMapper"/>
+</beans>
