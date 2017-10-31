@@ -14,14 +14,18 @@ import com.amqp.outbound.gateway.OutboundGateway;
 
 @Controller
 public class OutboundEndpoint {
-	
+
 	@Autowired
 	private OutboundGateway gateway;
-	
+
 	@RequestMapping(value = {"/test"}, method = RequestMethod.POST, produces = "application/text")
 	@ResponseBody
 	public Callable<ResponseEntity<String>> processAuthorization(@RequestBody final String request){
-		return ()->ResponseEntity.ok(gateway.process(request));
+		return ()-> {
+			String result = gateway.process(request);
+			System.out.println("Request/reply result: " + result);
+			return ResponseEntity.ok(result);
+		};
 	}
-	
+
 }
